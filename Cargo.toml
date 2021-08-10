@@ -1,0 +1,19 @@
+[package]
+name = "octopass"
+version = "0.1.0"
+authors = ["uramnoil <25810983+UramnOIL@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tonic = "0.5.1"
+prost = "0.8"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio-stream = { version =  "0.1", features = ["net"] }
+async-stream = "0.3"
+once_cell = "1.8.0"
+futures-core = "0.3.16"
+
+[build-dependencies]
+tonic-build = "0.5.1"
