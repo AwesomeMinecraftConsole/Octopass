@@ -1,34 +1,60 @@
 use futures_core::Stream;
-use octopass::console_server;
-use octopass::{CommandResponse, Empty, LineRequest};
-use std::ffi::IntoStringError;
+use octopass::{
+    console_server::{Console, ConsoleServer},
+    CommandResponse, LineRequest, NotificationRequest, OperationResponse,
+};
 use std::pin::Pin;
-use std::sync::mpsc::RecvError;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-pub mod octopass {
+mod octopass {
     tonic::include_proto!("com.uramnoil.awesome_minecraft_console.protocols");
+    tonic::include_proto!("google.protobuf");
 }
 
 #[derive(Debug)]
-pub struct ConsoleServerService {
+struct ConsoleServerService {
     command_sender: broadcast::Sender<String>,
-    line_sender: broadcast::Sender<Result<String, Status>>,
+    line_sender: mpsc::Sender<Result<String, Status>>,
+    operation_sender: broadcast::Sender<Operation>,
+    notification_sender: mpsc::Sender<Result<String, Status>>,
+}
+
+#[derive(Clone)]
+enum Operation {
+    start,
 }
 
 #[tonic::async_trait]
-impl console_server::Console for ConsoleServerService {
-    type CommandStream =
-        Pin<Box<dyn Stream<Item = Result<CommandResponse, Status>> + Send + Sync + 'static>>;
-
-    async fn command(
+impl Console for ConsoleServerService {
+    type ConsoleStream =
+        Pin<Box<dyn Stream<Item = Result<CommandResponse, tonic::Status>> + Send + Sync + 'static>>;
+    async fn console(
         &self,
-        request: tonic::Request<octopass::Empty>,
-    ) -> Result<Response<Self::CommandStream>, tonic::Status> {
-        let (tx, mut rx) = mpsc::channel(32);
+        request: tonic::Request<tonic::Streaming<LineRequest>>,
+    ) -> Result<tonic::Response<Self::ConsoleStream>, tonic::Status> {
+        let line_sender = self.line_sender.clone();
+        let mut stream = request.into_inner();
+        tokio::spawn(async move {
+            loop {
+                let result = stream.message().await;
+                match result {
+                    Ok(Some(..)) | Err(..) => {
+                        let result = line_sender
+                            .send(result.map(|option| option.unwrap().line))
+                            .await;
+                        if let Err(..) = result {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        let (tx, rx) = mpsc::channel(32);
         let mut command_sender = self.command_sender.subscribe();
         tokio::spawn(async move {
             loop {
@@ -36,11 +62,11 @@ impl console_server::Console for ConsoleServerService {
                 let result = tx
                     .send(
                         result
-                            .map(|op| CommandResponse { message: op })
-                            .map_err(|op| Status::internal("internal error")),
+                            .map(|op| CommandResponse { command: op })
+                            .map_err(|_| Status::internal("internal error")),
                     )
                     .await;
-                if let Err(err) = result {
+                if let Err(..) = result {
                     break;
                 }
             }
@@ -48,29 +74,85 @@ impl console_server::Console for ConsoleServerService {
         Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
     }
 
-    async fn lines(
-        &self,
-        request: Request<Streaming<LineRequest>>,
-    ) -> Result<Response<octopass::Empty>, tonic::Status> {
-        let line_sender = self.line_sender.clone();
-        let mut stream = request.into_inner();
-        loop {
-            let result = stream.message().await;
-            match result {
-                Ok(Some(..)) | Err(..) => {
-                    let result = line_sender.send(result.map(|option| option.unwrap().message));
-                    if let Err(..) = result {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
+    type ManagementStream =
+        Pin<Box<dyn Stream<Item = Result<OperationResponse, Status>> + Send + Sync + 'static>>;
 
-        Ok(Response::new(octopass::Empty {}))
+    async fn management(
+        &self,
+        request: tonic::Request<tonic::Streaming<NotificationRequest>>,
+    ) -> Result<tonic::Response<Self::ManagementStream>, tonic::Status> {
+        let notification_sender = self.notification_sender.clone();
+        let mut stream = request.into_inner();
+        tokio::spawn(async move {
+            loop {
+                let result = stream.message().await;
+                match result {
+                    Ok(Some(..)) | Err(..) => {
+                        let result = notification_sender
+                            .send(result.map(|option| option.unwrap().message))
+                            .await;
+                        if let Err(..) = result {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        let (tx, rx) = mpsc::channel(32);
+        let mut operation_sender = self.operation_sender.subscribe();
+        let handler = tokio::spawn(async move {
+            loop {
+                let result = operation_sender.recv().await;
+                let result = tx
+                    .send(
+                        result
+                            .map(|op| OperationResponse {
+                                operation: match op {
+                                    start => 1,
+                                },
+                            })
+                            .map_err(|_| Status::internal("internal error")),
+                    )
+                    .await;
+                if let Err(..) = result {
+                    break;
+                }
+            }
+        });
+        Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
     }
 }
 
-fn main() {
-    println!("Hello, world!");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = "127.0.0.1:50052".parse().unwrap();
+
+    println!("listening on: {}", addr);
+
+    let (command_sender, mut command_receiver) = broadcast::channel(32);
+    let (line_sender, mut line_receiver) = mpsc::channel(32);
+    let (operation_sender, mut operation_receiver) = broadcast::channel(32);
+    let (notification_sender, mut notification_receiver) = mpsc::channel(32);
+
+    tokio::spawn(async move {
+        loop {
+            let line: Result<String, Status> = line_receiver.recv().await.unwrap();
+            println!("{}", line.unwrap())
+        }
+    });
+
+    let console = ConsoleServerService {
+        command_sender,
+        line_sender,
+        operation_sender,
+        notification_sender,
+    };
+
+    let svc = ConsoleServer::new(console);
+
+    Server::builder().add_service(svc).serve(addr).await?;
+
+    Ok(())
 }
