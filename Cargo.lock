@@ -299,6 +299,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "loyalwolf"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "futures-core",
+ "once_cell",
+ "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "memchr"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -349,20 +363,6 @@ checksum = "05499f3756671c15885fee9034446956fff3f243d6077b91e5767df161f766b3"
 dependencies = [
  "hermit-abi",
  "libc",
-]
-
-[[package]]
-name = "octopass"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "futures-core",
- "once_cell",
- "prost",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
 ]
 
 [[package]]
