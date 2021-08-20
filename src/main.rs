@@ -16,10 +16,8 @@ use endervision::{EnderVisionService, EnderVisionServer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let outward_addr = "127.0.0.1:50052".parse().unwrap();
+    let outward_addr = "127.0.0.1:50051".parse().unwrap();
     let inward_addr = "127.0.0.1:50052".parse().unwrap();
-
-    println!("listening on: {}", outward_addr);
 
     let (command_sender, mut command_receiver) = broadcast::channel(32);
     let (line_sender, mut line_receiver) = broadcast::channel(32);
@@ -30,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         loop {
             let line = line_receiver.recv().await;
-            println!("{}", line.unwrap())
+            println!("{}", line.unwrap());
         }
     });
 
@@ -56,11 +54,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let endervision_server = EnderVisionServer::new(endervision);
 
-
-
     tokio::select! {
-        inward = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(inward_addr) => {}
-        outward = Server::builder().add_service(endervision_server).serve(outward_addr) => {}
+        inward = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(inward_addr) => {
+            println!("inward service has finished");
+            if let Err(error) = inward {
+                println!("{}", error);
+            }
+        }
+        outward = Server::builder().add_service(endervision_server).serve(outward_addr) => {
+            println!("outward service has finished");
+            if let Err(error) = outward {
+                println!("{}", error);
+            }
+        }
     }
 
     Ok(())

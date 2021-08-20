@@ -1,3 +1,3 @@
 [submodule "proto"]
 	path = proto
-	url = https://github.com/AwesomeMinecraftConsole/protocols.git
+	url = https://github.com/AwesomeMinecraftConsole/proto.git
