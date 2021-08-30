@@ -24,14 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (operation_sender, mut operation_receiver) = broadcast::channel(32);
     let (notification_sender, mut notification_receiver) = broadcast::channel(32);
     let (online_players_sender, mut online_players_receiver) = broadcast::channel(32);
-
-    tokio::spawn(async move {
-        loop {
-            let line = line_receiver.recv().await;
-            println!("{}", line.unwrap());
-        }
-    });
-
+    
     let weaver = WeaverService::new(
         command_sender.clone(),
         line_sender.clone(),
