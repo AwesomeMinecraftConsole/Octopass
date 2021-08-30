@@ -55,24 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endervision_server = EnderVisionServer::new(endervision);
 
     tokio::select! {
-        inward = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(waver_and_acrobat_host) => {
-            println!("inward service has finished");
-            if let Err(error) = inward {
-                println!("{}", error);
-            }
-        }
-        outward = Server::builder().add_service(endervision_server).serve(endervision_host) => {
-            println!("outward service has finished");
-            if let Err(error) = outward {
-                println!("{}", error);
-            }
-        }
-        _ = async move {
-            loop {
-                let line = line_receiver.recv().await;
-                println!("{}", line.unwrap());
-            }
-        }
+        weaver_and_acrobat = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(waver_and_acrobat_host) => {}
+        endervision = Server::builder().add_service(endervision_server).serve(endervision_host) => {}
     }
 
     Ok(())
