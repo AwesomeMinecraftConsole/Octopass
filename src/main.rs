@@ -17,8 +17,7 @@ use endervision::{EnderVisionService, EnderVisionServer};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endervision_host = std::env::var("LOYALWOLF_ENDERVISION_HOST").parse()?;
-    let waver_host = std::end::var("LOYALWOLF_WAVER_HOST").parse()?;
-    let acrobat_host = std::end::var("LOYALWOLF_ACROBAT_HOST").parse()?;
+    let waver_and_acrobat_host = std::end::var("LOYALWOLF_WAVER_AND_ACROBAT_HOST").parse()?;
 
     let (command_sender, mut command_receiver) = broadcast::channel(32);
     let (line_sender, mut line_receiver) = broadcast::channel(32);
@@ -56,13 +55,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endervision_server = EnderVisionServer::new(endervision);
 
     tokio::select! {
-        inward = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(inward_addr) => {
+        inward = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(waver_and_acrobat_host) => {
             println!("inward service has finished");
             if let Err(error) = inward {
                 println!("{}", error);
             }
         }
-        outward = Server::builder().add_service(endervision_server).serve(outward_addr) => {
+        outward = Server::builder().add_service(endervision_server).serve(endervision_host) => {
             println!("outward service has finished");
             if let Err(error) = outward {
                 println!("{}", error);
