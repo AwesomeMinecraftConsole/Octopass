@@ -16,8 +16,9 @@ use endervision::{EnderVisionService, EnderVisionServer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let outward_addr = "127.0.0.1:50051".parse().unwrap();
-    let inward_addr = "127.0.0.1:50052".parse().unwrap();
+    let endervision_host = std::env::var("LOYALWOLF_ENDERVISION_HOST").parse()?;
+    let waver_host = std::end::var("LOYALWOLF_WAVER_HOST").parse()?;
+    let acrobat_host = std::end::var("LOYALWOLF_ACROBAT_HOST").parse()?;
 
     let (command_sender, mut command_receiver) = broadcast::channel(32);
     let (line_sender, mut line_receiver) = broadcast::channel(32);
@@ -65,6 +66,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("outward service has finished");
             if let Err(error) = outward {
                 println!("{}", error);
+            }
+        }
+        _ = async move {
+            loop {
+                let line = line_receiver.recv().await;
+                println!("{}", line.unwrap());
             }
         }
     }
