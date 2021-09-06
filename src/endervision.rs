@@ -1,6 +1,7 @@
 use std::pin::Pin;
 
 use futures_core::Stream;
+use log::{info, warn};
 use tokio::sync::{broadcast, TryAcquireError};
 use tokio::sync::broadcast::error::*;
 use tokio::sync::mpsc;
@@ -11,8 +12,8 @@ use proto::*;
 use proto::ender_vision_server::EnderVision;
 pub use proto::ender_vision_server::EnderVisionServer;
 
-use super::acrobat;
-use super::weaver;
+use crate::acrobat;
+use crate::weaver;
 
 mod proto {
     tonic::include_proto!("awesome_minecraft_console.endervision");
@@ -66,25 +67,38 @@ impl EnderVision for EnderVisionService {
         });
 
         let mut line_receiver = self.line_sender.subscribe();
-        let (tx, rx) = mpsc::channel(32);
+        let (tx, rx) = mpsc::channel(128);
         tokio::spawn(async move {
-            while let Ok(line) = line_receiver.recv().await {
-                 if let Err(mpsc::error::TrySendError::Closed(_)) = tx.try_send(Ok(weaver::Line { line })) {
-                     break;
+            loop {
+                match line_receiver.recv().await {
+                    Ok(line) => {
+                        if tx.send(Ok(weaver::Line { line })).await.is_err() {
+                            warn!("endervision: error");
+                            break;
+                       }
+                    }
+                    Err(RecvError::Lagged(skipped)) => {
+                        warn!("endervision: skipped {} message(s)", skipped);
+                    }
+                    Err(RecvError::Closed) => {
+                        info!("endervision: closed connection");
+                        let _ = tx.closed();
+                        break;
+                    }
                 }
             }
         });
         Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
     }
 
-    type ConsoleManagementStream = Pin<
+    type ManagementStream = Pin<
         Box<dyn Stream<Item=Result<weaver::Notification, Status>> + Send + Sync + 'static>,
     >;
 
-    async fn console_management(
+    async fn management(
         &self,
         request: tonic::Request<tonic::Streaming<weaver::Operation>>,
-    ) -> Result<tonic::Response<Self::ConsoleManagementStream>, tonic::Status> {
+    ) -> Result<tonic::Response<Self::ManagementStream>, tonic::Status> {
         let mut stream = request.into_inner();
         let mut operation_sender = self.operation_sender.clone();
         tokio::spawn(async move {
@@ -95,7 +109,7 @@ impl EnderVision for EnderVisionService {
             }
         });
 
-        let (tx, rx) = mpsc::channel(32);
+        let (tx, rx) = mpsc::channel(128);
         let mut notification_receiver = self.notification_sender.subscribe();
         tokio::spawn(async move {
             while let Ok(notification) = notification_receiver.recv().await {
@@ -118,7 +132,7 @@ impl EnderVision for EnderVisionService {
         &self,
         request: tonic::Request<()>,
     ) -> Result<tonic::Response<Self::OnlinePlayersStream>, tonic::Status> {
-        let (tx, rx) = mpsc::channel(32);
+        let (tx, rx) = mpsc::channel(128);
         let mut online_players_receiver = self.online_players_sender.subscribe();
         tokio::spawn(async move {
             while let Ok(online_players) = online_players_receiver.recv().await {

@@ -15,7 +15,7 @@ pub struct AcrobatService {
 }
 
 impl AcrobatService {
-    pub(crate) fn new(online_players_sender: broadcast::Sender<OnlinePlayers>) -> Self {
+    pub fn new(online_players_sender: broadcast::Sender<OnlinePlayers>) -> Self {
         AcrobatService {
             online_players_sender
         }

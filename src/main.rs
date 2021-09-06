@@ -2,29 +2,26 @@
 #![feature(in_band_lifetimes)]
 
 use tokio::sync::broadcast;
-use tokio::sync::mpsc;
 
-use tonic::{transport::Server, Status};
+use tonic::{transport::Server};
 
-mod endervision;
-mod weaver;
-mod acrobat;
-
-use weaver::{WeaverService, WeaverServer};
-use acrobat::{AcrobatService, AcrobatServer};
-use endervision::{EnderVisionService, EnderVisionServer};
+use loyalwolf::weaver::{WeaverService, WeaverServer};
+use loyalwolf::acrobat::{AcrobatService, AcrobatServer};
+use loyalwolf::endervision::{EnderVisionService, EnderVisionServer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let endervision_host = std::env::var("LOYALWOLF_ENDERVISION_HOST").parse()?;
-    let waver_and_acrobat_host = std::end::var("LOYALWOLF_WAVER_AND_ACROBAT_HOST").parse()?;
+    let endervision_host_row = std::env::var("LOYALWOLF_ENDERVISION_HOST")? + ":" + &std::env::var("LOYALWOLF_ENDERVISION_PORT")?;
+    let weaver_and_acrobat_host_row = std::env::var("LOYALWOLF_WEAVER_AND_ACROBAT_HOST")? + ":" + &std::env::var("LOYALWOLF_WEAVER_AND_ACROBAT_PORT")?;
+    let endervision_host = endervision_host_row.parse()?;
+    let waver_and_acrobat_host = weaver_and_acrobat_host_row.parse()?;
 
-    let (command_sender, mut command_receiver) = broadcast::channel(32);
-    let (line_sender, mut line_receiver) = broadcast::channel(32);
-    let (operation_sender, mut operation_receiver) = broadcast::channel(32);
-    let (notification_sender, mut notification_receiver) = broadcast::channel(32);
-    let (online_players_sender, mut online_players_receiver) = broadcast::channel(32);
-    
+    let (command_sender, _) = broadcast::channel(32);
+    let (line_sender, _) = broadcast::channel(32);
+    let (operation_sender, _) = broadcast::channel(32);
+    let (notification_sender, _) = broadcast::channel(32);
+    let (online_players_sender, _) = broadcast::channel(32);
+
     let weaver = WeaverService::new(
         command_sender.clone(),
         line_sender.clone(),
@@ -48,8 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endervision_server = EnderVisionServer::new(endervision);
 
     tokio::select! {
-        weaver_and_acrobat = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(waver_and_acrobat_host) => {}
-        endervision = Server::builder().add_service(endervision_server).serve(endervision_host) => {}
+        _ = Server::builder().add_service(weaver_server).add_service(acrobat_server).serve(waver_and_acrobat_host) => {}
+        _ = Server::builder().add_service(endervision_server).serve(endervision_host) => {}
     }
 
     Ok(())
