@@ -1,0 +1,81 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'oc'",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--example",
+                    "oc"
+                ],
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'oc'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=oc",
+                    "--package=loyalwolf"
+                ],
+                "filter": {
+                    "name": "oc",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'loyalwolf'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=loyalwolf",
+                    "--package=loyalwolf"
+                ],
+                "filter": {
+                    "name": "loyalwolf",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "LOYALWOLF_ENDERVISION_HOST": "127.0.0.1",
+                "LOYALWOLF_ENDERVISION_PORT": "50051",
+                "LOYALWOLF_WEAVER_AND_ACROBAT_HOST": "127.0.0.1",
+                "LOYALWOLF_WEAVER_AND_ACROBAT_PORT": "50052",
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'loyalwolf'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=loyalwolf",
+                    "--package=loyalwolf"
+                ],
+                "filter": {
+                    "name": "loyalwolf",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
